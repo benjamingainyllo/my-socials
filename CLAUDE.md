@@ -30,6 +30,17 @@ python3 scripts/sm.py move content/scaile/queue/2026-09-19-aeo-vs-seo.md posted 
 Run `python3 scripts/sm.py lint` before committing. It catches over-length
 tweets, missing front-matter, and queued posts with no date.
 
+## Loading performance data
+
+If Benjamin hands you a platform analytics export, don't transcribe it:
+
+```
+python3 scripts/sm.py import <file.csv> --account scaile --platform x --dry-run
+```
+
+Check the column mapping it prints, then run it without `--dry-run`. It
+dedupes on re-import, so running it twice is safe.
+
 ## Writing rules
 
 These apply to every draft you produce, for every account.

@@ -408,6 +408,154 @@ def cmd_accounts(args):
 
 
 # --------------------------------------------------------------------------
+# import: map a platform analytics export onto analytics/posts.csv
+# --------------------------------------------------------------------------
+
+# Checked in priority order. X, LinkedIn and Reddit exports all name these
+# differently, so match on the normalised header rather than an exact string.
+IMPORT_ALIASES = {
+    "impressions": ["impressions", "impression", "views", "totalviews", "reach"],
+    "likes": ["likes", "like", "favorites", "favorite", "upvotes", "reactions"],
+    "replies": ["replies", "reply", "comments", "comment"],
+    "reposts": ["reposts", "repost", "retweets", "retweet", "shares", "share"],
+    "clicks": ["urlclicks", "linkclicks", "permalinkclicks", "clicks", "click"],
+    "followers_gained": ["follows", "followersgained", "newfollowers", "netfollowers"],
+}
+DATE_ALIASES = ["date", "time", "posttime", "createdat", "published", "datetime", "postdate"]
+URL_ALIASES = ["permalink", "posturl", "url", "link", "permalinkurl"]
+ID_ALIASES = ["postid", "tweetid", "id", "slug"]
+TEXT_ALIASES = ["posttext", "tweettext", "text", "content", "title", "body"]
+
+
+def norm_header(h: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (h or "").lower())
+
+
+def find_col(headers: list, aliases: list, taken=()):
+    """Exact normalised match wins; only then fall back to a substring hit.
+
+    `taken` holds columns already claimed by an earlier field, so a loose
+    alias like "url" can't steal the "Url clicks" column from `clicks`.
+    """
+    normed = {norm_header(h): h for h in headers if h not in taken}
+    for alias in aliases:
+        if alias in normed:
+            return normed[alias]
+    for alias in aliases:
+        for key, original in normed.items():
+            if alias in key:
+                return original
+    return None
+
+
+def extract_date(value: str) -> str:
+    m = re.search(r"\d{4}-\d{2}-\d{2}", value or "")
+    if m:
+        return m.group(0)
+    m = re.search(r"(\d{2})[/.](\d{2})[/.](\d{4})", value or "")
+    if m:
+        d, mo, y = m.groups()
+        return f"{y}-{mo}-{d}"
+    return ""
+
+
+def cmd_import(args):
+    cfg = load_config()
+    if args.account not in cfg["accounts"]:
+        die(f"unknown account '{args.account}'. Known: {', '.join(cfg['accounts'])}")
+
+    src = Path(args.csv)
+    if not src.exists():
+        die(f"no such file: {args.csv}")
+
+    with src.open(newline="", encoding="utf-8-sig") as fh:
+        reader = csv.DictReader(fh)
+        headers = reader.fieldnames or []
+        rows = list(reader)
+    if not headers:
+        die(f"{args.csv} has no header row")
+
+    mapping = {}
+    for field, aliases in IMPORT_ALIASES.items():
+        mapping[field] = find_col(headers, aliases, taken=set(mapping.values()))
+    claimed = {c for c in mapping.values() if c}
+    date_col = find_col(headers, DATE_ALIASES, taken=claimed)
+    url_col = find_col(headers, URL_ALIASES, taken=claimed | {date_col})
+    id_col = find_col(headers, ID_ALIASES, taken=claimed | {date_col, url_col})
+    text_col = find_col(headers, TEXT_ALIASES,
+                        taken=claimed | {date_col, url_col, id_col})
+
+    print("COLUMN MAPPING")
+    for field, col in mapping.items():
+        print(f"  {field:<18} <- {col or '(not found, will be 0)'}")
+    for label, col in (("date", date_col), ("url", url_col),
+                       ("slug from", id_col or text_col)):
+        print(f"  {label:<18} <- {col or '(not found)'}")
+    print()
+
+    existing = {r["slug"] for r in read_csv(POSTS_CSV, POST_FIELDS)}
+    staged, skipped, undated = [], 0, 0
+
+    for row in rows:
+        post_id = (row.get(id_col) or "").strip() if id_col else ""
+        text = (row.get(text_col) or "").strip() if text_col else ""
+        if text and post_id:
+            # Readable in reports, still unique per post.
+            slug = f"{slugify(text)[:48]}-{re.sub(r'[^a-zA-Z0-9]', '', post_id)[-6:]}"
+        elif text:
+            slug = slugify(text[:60])
+        elif post_id:
+            slug = slugify(post_id)
+        else:
+            skipped += 1
+            continue
+        if not slug or slug == "untitled":
+            skipped += 1
+            continue
+        if slug in existing:
+            skipped += 1
+            continue
+
+        date = extract_date(row.get(date_col, "")) if date_col else ""
+        if not date:
+            undated += 1
+            date = args.date or today()
+
+        out = {
+            "date": date,
+            "account": args.account,
+            "platform": args.platform,
+            "slug": slug,
+            "url": (row.get(url_col) or "").strip() if url_col else "",
+            "notes": args.topic or "",
+        }
+        for field, col in mapping.items():
+            out[field] = int(num(re.sub(r"[,\s]", "", row.get(col, "")))) if col else 0
+        staged.append(out)
+        existing.add(slug)
+
+    if args.dry_run:
+        for row in staged[:10]:
+            print(f"  {row['date']}  {row['impressions']:>8,} impr  "
+                  f"{row['likes']:>6,} likes  {row['slug']}")
+        if len(staged) > 10:
+            print(f"  ... and {len(staged) - 10} more")
+        print(f"\ndry run: {len(staged)} would import, {skipped} skipped "
+              f"(duplicate or unidentifiable)")
+        return 0
+
+    for row in staged:
+        append_csv(POSTS_CSV, POST_FIELDS, row)
+    print(f"imported {len(staged)} row(s) into {rel(POSTS_CSV)}")
+    if skipped:
+        print(f"skipped {skipped} (already present, or no id/text column to key on)")
+    if undated:
+        print(f"note: {undated} row(s) had no parsable date, dated {args.date or today()}")
+    print("\nnow run: python3 scripts/sm.py report")
+    return 0
+
+
+# --------------------------------------------------------------------------
 
 def build_parser():
     p = argparse.ArgumentParser(prog="sm", description="social ops for this repo")
@@ -469,6 +617,16 @@ def build_parser():
 
     a = sub.add_parser("accounts", help="show accounts and pipeline counts")
     a.set_defaults(func=cmd_accounts)
+
+    imp = sub.add_parser("import", help="bulk-load a platform analytics export")
+    imp.add_argument("csv", help="path to the exported csv")
+    imp.add_argument("--account", required=True)
+    imp.add_argument("--platform", required=True)
+    imp.add_argument("--topic", help="tag every imported row with this topic")
+    imp.add_argument("--date", help="fallback date for rows with no parsable date")
+    imp.add_argument("--dry-run", action="store_true",
+                     help="show the column mapping and a preview, write nothing")
+    imp.set_defaults(func=cmd_import)
 
     return p
 

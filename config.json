@@ -1,17 +1,21 @@
 {
-  "_comment": "Edit this. One entry per account you run. `platforms` order matters - the first is the default for `sm new`.",
+  "_comment": "One entry per account. `platforms` order matters - the first is the default for `sm new`. Handles are display-only; the account key is what the CLI uses.",
   "accounts": {
     "scaile": {
-      "platforms": ["x", "reddit", "linkedin"],
-      "handles": { "x": "@scaile", "reddit": "u/scaile", "linkedin": "scaile" },
+      "platforms": ["x", "linkedin", "reddit"],
+      "handles": {
+        "x": "TODO",
+        "linkedin": "scaile-technologies",
+        "reddit": "TODO"
+      },
       "owner": "brand",
-      "notes": "SCAILE brand account - AI visibility / AI search"
+      "notes": "SCAILE brand - GEO execution layer, Hamburg + Munich"
     },
     "benjamin": {
       "platforms": ["x", "reddit"],
-      "handles": { "x": "@benjamin", "reddit": "u/benjamin" },
+      "handles": { "x": "TODO", "reddit": "TODO" },
       "owner": "me",
-      "notes": "My personal account"
+      "notes": "Personal - community-led growth, AI social ops"
     }
   },
   "platforms": {

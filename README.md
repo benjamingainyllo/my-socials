@@ -36,10 +36,20 @@ sm move content/scaile/queue/2026-09-19-aeo-vs-seo.md posted --url https://x.com
 ## Weekly loop
 
 ```bash
+# bulk: export analytics from X/LinkedIn/Reddit, then
+sm import ~/Downloads/x-analytics.csv --account scaile --platform x --dry-run
+sm import ~/Downloads/x-analytics.csv --account scaile --platform x
+
+# or one post at a time
 sm log 2026-09-19-aeo-vs-seo --impressions 41000 --likes 380 --replies 44 --reposts 61
+
 sm snapshot scaile x 3120
 sm report --since 2026-09-12
 ```
+
+`import` figures out the column names itself, so a raw platform export works
+without editing. It skips rows already in the CSV, so re-importing the same
+export is safe. Always `--dry-run` first to check the column mapping.
 
 `report` gives you per-account rollups, top posts by engagement rate and by
 reach, performance grouped by topic, and follower deltas. That's the input
@@ -69,8 +79,9 @@ point of keeping this in one repo.
 
 ## First things to do
 
-1. Replace the placeholder accounts in `config.json` with your real ones.
-2. Fill in `docs/voice/*.md`. The `Proof` and `Reference posts` sections
-   matter most - without them, drafts come out generic.
-3. Backfill `analytics/posts.csv` with your last 20-30 posts. Reports are
-   only useful once there's a baseline.
+1. Fill in the `TODO` handles in `config.json`. Add any staff or client
+   accounts you want tracked here.
+2. Paste real posts into the `Reference posts` section of `docs/voice/*.md`.
+   Everything else in those files is filled in.
+3. Export your analytics from each platform and run `sm import` on the file.
+   Reports need ~30 posts before the topic breakdown means anything.
