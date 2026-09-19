@@ -1,0 +1,21 @@
+name: lint content
+
+on:
+  push:
+    paths:
+      - 'content/**'
+      - 'config.json'
+      - 'scripts/**'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check front-matter and length limits
+        run: python3 scripts/sm.py lint --strict

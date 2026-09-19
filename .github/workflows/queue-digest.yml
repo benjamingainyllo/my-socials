@@ -1,0 +1,57 @@
+name: queue digest
+
+# Keeps one open issue up to date with what's scheduled and what's overdue.
+# Never opens a second issue, so it can't spam you.
+# Runs 07:00 UTC on weekdays. Change or delete the schedule below to stop it.
+
+on:
+  schedule:
+    - cron: '0 7 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build digest
+        id: digest
+        run: |
+          {
+            echo 'Updated: '"$(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo
+            echo '```'
+            python3 scripts/sm.py due --days 7
+            echo '```'
+            echo
+            echo '<details><summary>Pipeline</summary>'
+            echo
+            echo '```'
+            python3 scripts/sm.py accounts
+            echo '```'
+            echo
+            echo '</details>'
+          } > digest.md
+
+      - name: Upsert the digest issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="Content queue"
+          NUMBER=$(gh issue list --state open --search "$TITLE in:title" \
+                   --json number,title \
+                   --jq "map(select(.title == \"$TITLE\")) | .[0].number // empty")
+          if [ -n "$NUMBER" ]; then
+            gh issue edit "$NUMBER" --body-file digest.md
+            echo "updated issue #$NUMBER"
+          else
+            gh issue create --title "$TITLE" --body-file digest.md
+          fi

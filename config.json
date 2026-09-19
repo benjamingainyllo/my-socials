@@ -1,0 +1,22 @@
+{
+  "_comment": "Edit this. One entry per account you run. `platforms` order matters - the first is the default for `sm new`.",
+  "accounts": {
+    "scaile": {
+      "platforms": ["x", "reddit", "linkedin"],
+      "handles": { "x": "@scaile", "reddit": "u/scaile", "linkedin": "scaile" },
+      "owner": "brand",
+      "notes": "SCAILE brand account - AI visibility / AI search"
+    },
+    "benjamin": {
+      "platforms": ["x", "reddit"],
+      "handles": { "x": "@benjamin", "reddit": "u/benjamin" },
+      "owner": "me",
+      "notes": "My personal account"
+    }
+  },
+  "platforms": {
+    "x": { "limit": 280 },
+    "reddit": { "limit": 40000, "title_limit": 300 },
+    "linkedin": { "limit": 3000 }
+  }
+}
